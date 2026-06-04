@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AICare Widget — Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: #f8f9fc;
+    color: #0d0f1a;
+    min-height: 100vh;
+  }
+
+  /* Nav */
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid #eaecf0;
+    padding: 0 5%;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 60px;
+  }
+  .nav-logo { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 1rem; color: #0d0f1a; text-decoration: none; }
+  .nav-logo-mark { width: 30px; height: 30px; background: #4f46e5; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+  .nav-links { display: flex; gap: 1.8rem; list-style: none; }
+  .nav-links a { font-size: .875rem; font-weight: 500; color: #5a6278; text-decoration: none; transition: color .15s; }
+  .nav-links a:hover { color: #0d0f1a; }
+  .nav-cta { background: #0d0f1a; color: #fff; padding: 8px 18px; border-radius: 8px; font-size: .875rem; font-weight: 600; text-decoration: none; transition: background .15s; }
+  .nav-cta:hover { background: #4f46e5; }
+
+  /* Hero */
+  .hero {
+    max-width: 1080px; margin: 0 auto;
+    padding: 6rem 5% 4rem;
+    text-align: center;
+  }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #eef2ff; color: #4f46e5;
+    padding: 5px 14px; border-radius: 100px;
+    font-size: .78rem; font-weight: 600; letter-spacing: .02em;
+    margin-bottom: 1.6rem;
+    border: 1px solid #c7d2fe;
+  }
+  .hero-badge span { width: 6px; height: 6px; background: #4f46e5; border-radius: 50%; }
+  h1 {
+    font-size: clamp(2.2rem, 5vw, 3.8rem);
+    font-weight: 800;
+    line-height: 1.12;
+    letter-spacing: -.04em;
+    color: #0d0f1a;
+    margin-bottom: 1.4rem;
+  }
+  h1 em { font-style: normal; color: #4f46e5; }
+  .hero-sub {
+    font-size: 1.1rem; color: #5a6278; line-height: 1.7;
+    max-width: 580px; margin: 0 auto 2.4rem;
+  }
+  .hero-actions { display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap; }
+  .btn-primary {
+    background: #0d0f1a; color: #fff;
+    padding: 13px 28px; border-radius: 10px;
+    font-size: .94rem; font-weight: 600;
+    text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+    transition: background .15s, transform .1s;
+  }
+  .btn-primary:hover { background: #4f46e5; transform: translateY(-1px); }
+  .btn-secondary {
+    background: #fff; color: #374151;
+    padding: 13px 28px; border-radius: 10px;
+    font-size: .94rem; font-weight: 600;
+    text-decoration: none; border: 1.5px solid #e4e8f0;
+    transition: border-color .15s, transform .1s;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn-secondary:hover { border-color: #0d0f1a; transform: translateY(-1px); }
+
+  /* Code snippet */
+  .code-block {
+    max-width: 640px; margin: 3rem auto 0;
+    background: #0d0f1a; border-radius: 12px;
+    overflow: hidden; text-align: left;
+    box-shadow: 0 8px 32px rgba(0,0,0,.12);
+  }
+  .code-top {
+    padding: 10px 16px;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .code-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .code-label { font-size: .72rem; color: rgba(255,255,255,.3); margin-left: auto; font-family: monospace; }
+  .code-body { padding: 16px 20px; font-family: 'SF Mono','Fira Code',monospace; font-size: .8rem; line-height: 1.8; }
+  .t-comment { color: #6b7280; }
+  .t-tag { color: #f472b6; }
+  .t-attr { color: #93c5fd; }
+  .t-val { color: #86efac; }
+
+  /* Features */
+  .features {
+    max-width: 1080px; margin: 5rem auto;
+    padding: 0 5%;
+  }
+  .features-label {
+    text-align: center;
+    font-size: .7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .12em; color: #9aa0b4; margin-bottom: .75rem;
+  }
+  .features-title {
+    text-align: center;
+    font-size: clamp(1.6rem, 3vw, 2.4rem);
+    font-weight: 800; letter-spacing: -.03em;
+    margin-bottom: 3rem; color: #0d0f1a;
+  }
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.2rem;
+  }
+  .feat-card {
+    background: #fff; border: 1.5px solid #e4e8f0;
+    border-radius: 14px; padding: 1.6rem;
+    transition: box-shadow .2s, transform .2s;
+  }
+  .feat-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,.08); transform: translateY(-2px); }
+  .feat-icon {
+    width: 44px; height: 44px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem; margin-bottom: 1rem;
+  }
+  .feat-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: .4rem; color: #0d0f1a; }
+  .feat-card p { font-size: .875rem; color: #5a6278; line-height: 1.6; }
+
+  /* Pricing */
+  .pricing {
+    max-width: 900px; margin: 0 auto 5rem;
+    padding: 0 5%;
+  }
+  .pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.2rem;
+    margin-top: 3rem;
+  }
+  .plan {
+    background: #fff; border: 1.5px solid #e4e8f0;
+    border-radius: 16px; padding: 2rem;
+    position: relative;
+  }
+  .plan.featured {
+    background: #0d0f1a; border-color: #0d0f1a;
+    color: #fff;
+  }
+  .plan.featured .plan-name { color: rgba(255,255,255,.6); }
+  .plan.featured .plan-sub { color: rgba(255,255,255,.5); }
+  .plan.featured .plan-feature { color: rgba(255,255,255,.75); border-color: rgba(255,255,255,.08); }
+  .plan.featured .plan-feature::before { filter: brightness(0) invert(1); }
+  .plan-badge {
+    position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+    background: #4f46e5; color: #fff;
+    padding: 3px 12px; border-radius: 100px;
+    font-size: .7rem; font-weight: 700; letter-spacing: .05em;
+    white-space: nowrap;
+  }
+  .plan-name { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #9aa0b4; margin-bottom: .5rem; }
+  .plan-price { font-size: 2.4rem; font-weight: 800; letter-spacing: -.04em; line-height: 1; margin-bottom: .3rem; }
+  .plan-price span { font-size: 1rem; font-weight: 500; letter-spacing: 0; }
+  .plan-sub { font-size: .82rem; color: #5a6278; margin-bottom: 1.4rem; }
+  .plan-features { list-style: none; margin-bottom: 1.6rem; }
+  .plan-feature { font-size: .84rem; color: #374151; padding: .45rem 0; border-bottom: 1px solid #f0f2f5; display: flex; align-items: center; gap: .5rem; }
+  .plan-feature:last-child { border: none; }
+  .plan-feature::before { content: '✓'; font-weight: 700; color: #10b981; flex-shrink: 0; }
+  .plan-btn {
+    width: 100%; padding: 12px; border-radius: 10px;
+    font-size: .9rem; font-weight: 600; cursor: pointer;
+    border: none; text-align: center; display: block;
+    text-decoration: none; transition: opacity .15s;
+  }
+  .plan-btn:hover { opacity: .85; }
+  .plan .plan-btn { background: #0d0f1a; color: #fff; }
+  .plan.featured .plan-btn { background: #fff; color: #0d0f1a; }
+
+  /* Demo CTA */
+  .demo-cta {
+    max-width: 700px; margin: 0 auto 5rem;
+    padding: 3rem 5%;
+    background: linear-gradient(135deg, #0d0f1a 0%, #1e1b4b 100%);
+    border-radius: 20px;
+    text-align: center;
+    color: #fff;
+  }
+  .demo-cta h2 { font-size: 1.8rem; font-weight: 800; letter-spacing: -.03em; margin-bottom: .8rem; }
+  .demo-cta p { color: rgba(255,255,255,.65); font-size: .94rem; margin-bottom: 1.6rem; line-height: 1.6; }
+  .demo-cta .btn-primary { background: #fff; color: #0d0f1a; }
+  .demo-cta .btn-primary:hover { background: #eef2ff; color: #4f46e5; transform: translateY(-1px); }
+
+  footer {
+    border-top: 1px solid #e4e8f0;
+    padding: 2rem 5%;
+    text-align: center;
+    font-size: .82rem;
+    color: #9aa0b4;
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="#" class="nav-logo">
+    <div class="nav-logo-mark">💬</div>
+    AICare
+  </a>
+  <ul class="nav-links">
+    <li><a href="#features">Funzionalità</a></li>
+    <li><a href="#pricing">Prezzi</a></li>
+    <li><a href="#install">Installazione</a></li>
+  </ul>
+  <a href="mailto:gianmarco.milocco@gmail.com" class="nav-cta">Contattaci</a>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-badge"><span></span>Powered by Claude AI</div>
+  <h1>Customer care <em>AI</em><br>pronto in 5 minuti</h1>
+  <p class="hero-sub">
+    Un'unica riga di codice sul tuo sito. L'agente AI risponde 24/7, gestisce ticket, parla su WhatsApp e impara dalla tua knowledge base.
+  </p>
+  <div class="hero-actions">
+    <a href="#" class="btn-primary" onclick="document.getElementById('aic-btn').click(); return false;">
+      💬 Prova la demo live
+    </a>
+    <a href="mailto:gianmarco.milocco@gmail.com" class="btn-secondary">Richiedi accesso →</a>
+  </div>
+
+  <div class="code-block" id="install">
+    <div class="code-top">
+      <div class="code-dot" style="background:#ef4444"></div>
+      <div class="code-dot" style="background:#f59e0b"></div>
+      <div class="code-dot" style="background:#10b981"></div>
+      <span class="code-label">index.html</span>
+    </div>
+    <div class="code-body">
+      <span class="t-comment">&lt;!-- Incolla prima di &lt;/body&gt; — funziona su qualsiasi sito --&gt;</span><br>
+      <span class="t-tag">&lt;script</span><br>
+      &nbsp;&nbsp;<span class="t-attr">src</span>=<span class="t-val">"https://api.aicare.io/widget.js"</span><br>
+      &nbsp;&nbsp;<span class="t-attr">data-key</span>=<span class="t-val">"aic_la_tua_chiave"</span><br>
+      &nbsp;&nbsp;<span class="t-attr">data-name</span>=<span class="t-val">"Acme Srl"</span><br>
+      &nbsp;&nbsp;<span class="t-attr">data-color</span>=<span class="t-val">"#4f46e5"</span><br>
+      <span class="t-tag">&gt;&lt;/script&gt;</span>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="features" id="features">
+  <div class="features-label">Funzionalità</div>
+  <div class="features-title">Tutto quello che serve<br>per il customer care moderno</div>
+  <div class="features-grid">
+    <div class="feat-card">
+      <div class="feat-icon" style="background:#eef2ff">🤖</div>
+      <h3>AI Conversazionale</h3>
+      <p>Risponde a domande complesse, capisce il contesto e si adatta al tono della tua azienda. Powered by Claude (Anthropic).</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon" style="background:#f0fdf4">🎫</div>
+      <h3>Ticket Automatici</h3>
+      <p>Quando l'AI non riesce a risolvere, apre un ticket prioritario in automatico e avvisa il tuo team via email.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon" style="background:#fefce8">📱</div>
+      <h3>WhatsApp Business</h3>
+      <p>Lo stesso agente risponde anche su WhatsApp. Zero codice aggiuntivo, integrazione Twilio in un click.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon" style="background:#fff1f2">📚</div>
+      <h3>Knowledge Base</h3>
+      <p>Carica FAQ, policy, catalogo prodotti. L'AI impara e risponde solo con le tue informazioni — zero allucinazioni.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon" style="background:#f0f4ff">🔗</div>
+      <h3>Import da URL</h3>
+      <p>Incolla il link al tuo sito o documento Google Docs. Claude analizza tutto e genera la KB automaticamente.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon" style="background:#f0fdf4">📊</div>
+      <h3>Analytics</h3>
+      <p>Dashboard con intent distribution, sentiment analysis, ticket rate e tutte le conversazioni in tempo reale.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Pricing -->
+<section class="pricing" id="pricing">
+  <div class="features-label" style="text-align:center">Prezzi</div>
+  <div class="features-title" style="text-align:center">Semplice. Scalabile. Conveniente.</div>
+  <div class="pricing-grid">
+    <div class="plan">
+      <div class="plan-name">Starter</div>
+      <div class="plan-price">€149<span>/mese</span></div>
+      <div class="plan-sub">Per PMI e negozi online</div>
+      <ul class="plan-features">
+        <li class="plan-feature">1 agente AI</li>
+        <li class="plan-feature">500 conversazioni/mese</li>
+        <li class="plan-feature">Knowledge base illimitata</li>
+        <li class="plan-feature">Ticket automatici</li>
+        <li class="plan-feature">Widget embeddabile</li>
+      </ul>
+      <a href="mailto:gianmarco.milocco@gmail.com" class="plan-btn">Inizia gratis →</a>
+    </div>
+    <div class="plan featured">
+      <div class="plan-badge">PIÙ SCELTO</div>
+      <div class="plan-name">Growth</div>
+      <div class="plan-price">€349<span>/mese</span></div>
+      <div class="plan-sub">Per e-commerce e SaaS</div>
+      <ul class="plan-features">
+        <li class="plan-feature">3 agenti AI</li>
+        <li class="plan-feature">Conversazioni illimitate</li>
+        <li class="plan-feature">WhatsApp Business</li>
+        <li class="plan-feature">Analytics avanzate</li>
+        <li class="plan-feature">Import da URL / PDF</li>
+        <li class="plan-feature">Supporto prioritario</li>
+      </ul>
+      <a href="mailto:gianmarco.milocco@gmail.com" class="plan-btn">Contattaci →</a>
+    </div>
+    <div class="plan">
+      <div class="plan-name">Enterprise</div>
+      <div class="plan-price">Custom</div>
+      <div class="plan-sub">Su misura per grandi aziende</div>
+      <ul class="plan-features">
+        <li class="plan-feature">Agenti illimitati</li>
+        <li class="plan-feature">White-label completo</li>
+        <li class="plan-feature">SLA garantito</li>
+        <li class="plan-feature">Onboarding dedicato</li>
+        <li class="plan-feature">Integrazione CRM</li>
+      </ul>
+      <a href="mailto:gianmarco.milocco@gmail.com" class="plan-btn">Parliamo →</a>
+    </div>
+  </div>
+</section>
+
+<!-- CTA finale -->
+<div style="max-width:1080px;margin:0 auto;padding:0 5%">
+  <div class="demo-cta">
+    <h2>Inizia oggi stesso</h2>
+    <p>Setup in 5 minuti. Nessuna carta di credito richiesta per il periodo di prova. Il tuo agente AI è online 24/7 dal primo giorno.</p>
+    <a href="mailto:gianmarco.milocco@gmail.com" class="btn-primary">Richiedi accesso gratuito →</a>
+  </div>
+</div>
+
+<footer>
+  © 2025 AICare — Powered by Anthropic Claude · Tutti i diritti riservati
+</footer>
+
+<!-- THE WIDGET — questo è tutto quello che serve -->
+<script
+  src="http://localhost:8503/widget.js"
+  data-key="aic_TD4xyhG8L9nEbYvvPqxabBwkbNS06BeF75nFWgS_-3Q"
+  data-api="http://localhost:8503"
+  data-name="AICare Demo"
+  data-greeting="Ciao! Sono l'assistente AI di AICare. Chiedimi qualcosa — sono qui per aiutarti 24/7."
+  data-color="#4f46e5"
+></script>
+
+</body>
+</html>

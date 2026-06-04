@@ -1,0 +1,29 @@
+services:
+  # ── API + Widget (FastAPI) ─────────────────────────────
+  - type: web
+    name: aicare-api
+    runtime: python
+    rootDir: api
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ADMIN_SECRET
+        sync: false
+
+  # ── Admin Panel (Streamlit) ────────────────────────────
+  - type: web
+    name: aicare-admin
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
+    envVars:
+      - key: DEMO_MODE
+        value: "false"
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: CONTACT_NAME
+        value: "Gianmarco"
+      - key: CONTACT_EMAIL
+        value: "gianmarco.milocco@gmail.com"
