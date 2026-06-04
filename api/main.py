@@ -18,6 +18,7 @@ load_dotenv(Path(__file__).parent.parent.parent / ".env")
 import db as _db
 import ai as _ai
 _db.init()
+_db.seed_kb("demo")  # ensure demo KB is always available
 
 app = FastAPI(title="AICare API", version="1.0.0", docs_url="/api/docs")
 
