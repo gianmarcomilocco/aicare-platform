@@ -1,5 +1,10 @@
+databases:
+  - name: aicare-db
+    plan: free
+    databaseName: aicare
+    user: aicare
+
 services:
-  # ── API + Widget (FastAPI) ─────────────────────────────
   - type: web
     name: aicare-api
     runtime: python
@@ -11,10 +16,13 @@ services:
         sync: false
       - key: ADMIN_SECRET
         sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: aicare-db
+          property: connectionString
 
-  # ── Admin Panel (Streamlit) ────────────────────────────
   - type: web
-    name: aicare-admin
+    name: aicare-admin-panel
     runtime: python
     buildCommand: pip install -r requirements.txt
     startCommand: streamlit run app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
@@ -27,3 +35,7 @@ services:
         value: "Gianmarco"
       - key: CONTACT_EMAIL
         value: "gianmarco.milocco@gmail.com"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: aicare-db
+          property: connectionString
