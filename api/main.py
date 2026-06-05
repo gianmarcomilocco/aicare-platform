@@ -5,14 +5,15 @@ Powers the embeddable widget and WhatsApp integration.
 
 from fastapi import FastAPI, HTTPException, Header, Request, Response, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, PlainTextResponse
-from pydantic import BaseModel, field_validator, EmailStr
+from fastapi.responses import FileResponse
+from pydantic import BaseModel, field_validator
 from typing import Optional
 from pathlib import Path
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-import sys, uuid, secrets, os, re
+import sys, secrets, os, re
+from datetime import datetime, timezone
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from dotenv import load_dotenv
@@ -22,6 +23,12 @@ import db as _db
 import ai as _ai
 _db.init()
 _db.seed_kb("demo")
+
+_RETENTION_DAYS = int(os.getenv("DATA_RETENTION_DAYS", "365"))
+_purged = _db.purge_all_old_conversations(_RETENTION_DAYS)
+if _purged:
+    import logging
+    logging.getLogger("aicare").info("Purged %d old conversations (retention=%d days)", _purged, _RETENTION_DAYS)
 
 # ── Rate limiter ──────────────────────────────────────────
 limiter = Limiter(key_func=get_remote_address, default_limits=["200/hour"])
@@ -198,7 +205,6 @@ async def whatsapp_webhook(request: Request,
     """Twilio WhatsApp webhook."""
     data     = await request.form()
     message  = (data.get("Body") or "").strip()[:2000]
-    from_num = data.get("From", "")
     twiml_empty = '<?xml version="1.0"?><Response></Response>'
 
     if not message:
@@ -209,7 +215,6 @@ async def whatsapp_webhook(request: Request,
         return Response(content=twiml_empty, media_type="text/xml")
 
     kb_items = _db.get_kb(client["username"])
-    clf      = _ai.classify(message)
     response = _ai.generate_response(message, [], kb_items, client)
 
     twiml = f'<?xml version="1.0"?><Response><Message>{response}</Message></Response>'
@@ -253,3 +258,19 @@ async def gdpr_delete_customer(request: Request, body: GDPRDeleteRequest,
         "email": body.customer_email,
         "message": f"Deleted {deleted} conversation(s) and related data.",
     }
+
+
+@app.get("/v1/gdpr/export-customer")
+@limiter.limit("10/minute")
+async def gdpr_export_customer(request: Request, email: str,
+                                client: dict = Depends(get_client)):
+    """
+    GDPR Art. 20 — right to data portability.
+    Returns all conversations and messages for a customer email as JSON.
+    Requires the company API key.
+    """
+    if not email or not re.match(r"^[^@\s]{1,64}@[^@\s]{1,255}$", email):
+        raise HTTPException(400, "valid email required")
+    data = _db.export_customer_data(client["username"], email)
+    data["exported_at"] = datetime.now(timezone.utc).isoformat()
+    return data

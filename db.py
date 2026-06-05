@@ -253,6 +253,55 @@ def update_ticket_notes(tid, notes):
     with _db() as c:
         cur = c.cursor(); cur.execute(f"UPDATE tickets SET notes={PH} WHERE id={PH}", (notes,tid))
 
+def export_customer_data(username, customer_email):
+    """GDPR Art. 20 — data portability: returns all data for a customer email."""
+    with _db() as c:
+        cur = c.cursor()
+        cur.execute(f"SELECT * FROM conversations WHERE username={PH} AND customer_email={PH} ORDER BY created_at", (username, customer_email))
+        convs = _rows(cur.fetchall())
+        result = []
+        for conv in convs:
+            cur.execute(f"SELECT role, content, created_at FROM messages WHERE conversation_id={PH} ORDER BY created_at", (conv["id"],))
+            msgs = _rows(cur.fetchall())
+            cur.execute(f"SELECT title, category, priority, status, created_at FROM tickets WHERE conversation_id={PH}", (conv["id"],))
+            tickets = _rows(cur.fetchall())
+            result.append({"conversation": conv, "messages": msgs, "tickets": tickets})
+    return {"customer_email": customer_email, "exported_at": None, "conversations": result}
+
+def purge_old_conversations(username, days):
+    """Delete conversations (and related data) older than `days` days."""
+    with _db() as c:
+        cur = c.cursor()
+        if USE_PG:
+            cur.execute(f"SELECT id FROM conversations WHERE username={PH} AND updated_at < NOW() - INTERVAL '{int(days)} days'", (username,))
+        else:
+            cur.execute(f"SELECT id FROM conversations WHERE username={PH} AND datetime(updated_at) < datetime('now', '-{int(days)} days')", (username,))
+        conv_ids = [r["id"] for r in _rows(cur.fetchall())]
+        for cid in conv_ids:
+            cur.execute(f"DELETE FROM messages WHERE conversation_id={PH}", (cid,))
+            cur.execute(f"DELETE FROM tickets WHERE conversation_id={PH}", (cid,))
+        if conv_ids:
+            placeholders = ",".join([PH] * len(conv_ids))
+            cur.execute(f"DELETE FROM conversations WHERE id IN ({placeholders})", tuple(conv_ids))
+    return len(conv_ids)
+
+def purge_all_old_conversations(days):
+    """Purge old conversations across all tenants (called at startup)."""
+    with _db() as c:
+        cur = c.cursor()
+        if USE_PG:
+            cur.execute(f"SELECT id FROM conversations WHERE updated_at < NOW() - INTERVAL '{int(days)} days'")
+        else:
+            cur.execute(f"SELECT id FROM conversations WHERE datetime(updated_at) < datetime('now', '-{int(days)} days')")
+        conv_ids = [r["id"] for r in _rows(cur.fetchall())]
+        for cid in conv_ids:
+            cur.execute(f"DELETE FROM messages WHERE conversation_id={PH}", (cid,))
+            cur.execute(f"DELETE FROM tickets WHERE conversation_id={PH}", (cid,))
+        if conv_ids:
+            placeholders = ",".join([PH] * len(conv_ids))
+            cur.execute(f"DELETE FROM conversations WHERE id IN ({placeholders})", tuple(conv_ids))
+    return len(conv_ids)
+
 def delete_customer_data(username, customer_email):
     """GDPR Art. 17 — deletes all data for a specific customer email."""
     with _db() as c:
