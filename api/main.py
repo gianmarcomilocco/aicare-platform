@@ -6,10 +6,13 @@ Powers the embeddable widget and WhatsApp integration.
 from fastapi import FastAPI, HTTPException, Header, Request, Response, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator, EmailStr
 from typing import Optional
 from pathlib import Path
-import sys, uuid, secrets, os
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+import sys, uuid, secrets, os, re
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from dotenv import load_dotenv
@@ -18,9 +21,19 @@ load_dotenv(Path(__file__).parent.parent.parent / ".env")
 import db as _db
 import ai as _ai
 _db.init()
-_db.seed_kb("demo")  # ensure demo KB is always available
+_db.seed_kb("demo")
 
-app = FastAPI(title="AICare API", version="1.0.0", docs_url="/api/docs")
+# ── Rate limiter ──────────────────────────────────────────
+limiter = Limiter(key_func=get_remote_address, default_limits=["200/hour"])
+
+app = FastAPI(
+    title="AICare API",
+    version="1.0.0",
+    docs_url="/api/docs" if os.getenv("ENVIRONMENT") != "production" else None,
+    redoc_url=None,
+)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
@@ -30,6 +43,20 @@ app.add_middleware(
 )
 
 WIDGET_PATH = Path(__file__).parent.parent / "widget" / "widget.js"
+
+SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
+}
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    for k, v in SECURITY_HEADERS.items():
+        response.headers[k] = v
+    return response
 
 # ── Auth ─────────────────────────────────────────────────
 
@@ -41,21 +68,66 @@ def get_client(x_api_key: str = Header(..., alias="X-Api-Key")) -> dict:
 
 # ── Schemas ───────────────────────────────────────────────
 
+_EMAIL_RE = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,255}$")
+
 class ChatRequest(BaseModel):
-    message: str
+    message:         str
     conversation_id: Optional[str] = None
     customer_name:   Optional[str] = "Visitatore"
     customer_email:  Optional[str] = ""
 
+    @field_validator("message")
+    @classmethod
+    def message_not_empty(cls, v):
+        v = v.strip()
+        if not v:
+            raise ValueError("message cannot be empty")
+        if len(v) > 2000:
+            raise ValueError("message too long (max 2000 chars)")
+        return v
+
+    @field_validator("customer_name")
+    @classmethod
+    def name_length(cls, v):
+        if v and len(v) > 120:
+            raise ValueError("customer_name too long")
+        return (v or "Visitatore").strip()
+
+    @field_validator("customer_email")
+    @classmethod
+    def email_format(cls, v):
+        if v and not _EMAIL_RE.match(v):
+            raise ValueError("invalid email format")
+        return (v or "").strip()
+
 class GenerateKeyRequest(BaseModel):
     username: str
     secret:   str
+
+    @field_validator("username")
+    @classmethod
+    def username_safe(cls, v):
+        if not re.match(r"^[a-z0-9_]{2,40}$", v):
+            raise ValueError("username must be 2-40 lowercase alphanumeric chars")
+        return v
+
+class GDPRDeleteRequest(BaseModel):
+    customer_email: str
+
+    @field_validator("customer_email")
+    @classmethod
+    def email_required(cls, v):
+        v = v.strip()
+        if not v or not _EMAIL_RE.match(v):
+            raise ValueError("valid customer_email required")
+        return v
 
 # ── Routes ────────────────────────────────────────────────
 
 @app.get("/")
 def health():
     return {"status": "ok", "service": "AICare API v1.0"}
+
 
 @app.get("/widget.js")
 def serve_widget():
@@ -64,8 +136,10 @@ def serve_widget():
     return FileResponse(WIDGET_PATH, media_type="application/javascript",
                         headers={"Cache-Control": "public, max-age=3600"})
 
+
 @app.post("/v1/chat")
-async def chat(body: ChatRequest, client: dict = Depends(get_client)):
+@limiter.limit("30/minute")
+async def chat(request: Request, body: ChatRequest, client: dict = Depends(get_client)):
     """Main chat endpoint — called by the JS widget."""
     conv_id = body.conversation_id
     int_id  = 0
@@ -73,8 +147,8 @@ async def chat(body: ChatRequest, client: dict = Depends(get_client)):
     if not conv_id:
         int_id  = _db.new_conversation(
             client["username"],
-            body.customer_name or "Visitatore",
-            body.customer_email or ""
+            body.customer_name,
+            body.customer_email,
         )
         conv_id = f"api_{int_id}"
     else:
@@ -83,7 +157,6 @@ async def chat(body: ChatRequest, client: dict = Depends(get_client)):
         except ValueError:
             int_id = 0
 
-    # History
     history = []
     if int_id:
         msgs    = _db.get_messages(int_id)
@@ -107,7 +180,7 @@ async def chat(body: ChatRequest, client: dict = Depends(get_client)):
         priority  = _ai.priority_from_sentiment(sentiment)
         ticket_id = _db.create_ticket(
             client["username"], int_id, title, intent, priority,
-            body.customer_name or "", body.customer_email or ""
+            body.customer_name, body.customer_email,
         )
 
     return {
@@ -119,11 +192,12 @@ async def chat(body: ChatRequest, client: dict = Depends(get_client)):
 
 
 @app.post("/v1/whatsapp")
+@limiter.limit("60/minute")
 async def whatsapp_webhook(request: Request,
                             x_api_key: str = Header(None, alias="X-Api-Key")):
     """Twilio WhatsApp webhook."""
     data     = await request.form()
-    message  = (data.get("Body") or "").strip()
+    message  = (data.get("Body") or "").strip()[:2000]
     from_num = data.get("From", "")
     twiml_empty = '<?xml version="1.0"?><Response></Response>'
 
@@ -143,10 +217,11 @@ async def whatsapp_webhook(request: Request,
 
 
 @app.post("/v1/keys/generate")
-def generate_key(body: GenerateKeyRequest):
+@limiter.limit("5/minute")
+def generate_key(request: Request, body: GenerateKeyRequest):
     """One-time call during client onboarding to create their API key."""
-    admin_secret = os.getenv("ADMIN_SECRET", "changeme")
-    if body.secret != admin_secret:
+    admin_secret = os.getenv("ADMIN_SECRET", "")
+    if not admin_secret or body.secret != admin_secret:
         raise HTTPException(403, "Forbidden")
     key = "aic_" + secrets.token_urlsafe(32)
     _db.save_api_key(body.username, key)
@@ -160,4 +235,21 @@ def get_my_key(client: dict = Depends(get_client)):
         "company_name": client.get("name"),
         "tone":         client.get("tone"),
         "language":     client.get("language"),
+    }
+
+
+@app.post("/v1/gdpr/delete-customer")
+@limiter.limit("10/minute")
+async def gdpr_delete_customer(request: Request, body: GDPRDeleteRequest,
+                                client: dict = Depends(get_client)):
+    """
+    GDPR Art. 17 — right to erasure.
+    Deletes all conversations, messages and tickets for the given customer email
+    within the company's account. Requires the company API key.
+    """
+    deleted = _db.delete_customer_data(client["username"], body.customer_email)
+    return {
+        "deleted_conversations": deleted,
+        "email": body.customer_email,
+        "message": f"Deleted {deleted} conversation(s) and related data.",
     }

@@ -285,9 +285,28 @@ if DEMO_MODE:
     user_display = "Demo"
     db.seed_kb("demo")
 else:
-    cfg_path = Path(__file__).parent / "auth_config.yaml"
-    with open(cfg_path) as f:
-        cfg = yaml.load(f, Loader=SafeLoader)
+    # Credentials loaded from env vars (production) or auth_config.yaml (local dev).
+    _admin_hash = os.getenv("ADMIN_PASSWORD_HASH", "")
+    _admin_user = os.getenv("ADMIN_USERNAME", "admin")
+    _cookie_key = os.getenv("AUTH_COOKIE_KEY", "")
+    if _admin_hash and _cookie_key:
+        cfg = {
+            "credentials": {
+                "usernames": {
+                    _admin_user: {
+                        "email": f"{_admin_user}@aicare.io",
+                        "name": _admin_user.title(),
+                        "password": _admin_hash,
+                    }
+                }
+            },
+            "cookie": {"name": "cc_agent_auth", "key": _cookie_key, "expiry_days": 7},
+        }
+    else:
+        cfg_path = Path(__file__).parent / "auth_config.yaml"
+        with open(cfg_path) as f:
+            cfg = yaml.load(f, Loader=SafeLoader)
+
     authenticator = stauth.Authenticate(
         cfg["credentials"], cfg["cookie"]["name"],
         cfg["cookie"]["key"], cfg["cookie"]["expiry_days"]

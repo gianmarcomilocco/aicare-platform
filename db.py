@@ -253,6 +253,20 @@ def update_ticket_notes(tid, notes):
     with _db() as c:
         cur = c.cursor(); cur.execute(f"UPDATE tickets SET notes={PH} WHERE id={PH}", (notes,tid))
 
+def delete_customer_data(username, customer_email):
+    """GDPR Art. 17 — deletes all data for a specific customer email."""
+    with _db() as c:
+        cur = c.cursor()
+        cur.execute(f"SELECT id FROM conversations WHERE username={PH} AND customer_email={PH}", (username, customer_email))
+        conv_ids = [r["id"] for r in _rows(cur.fetchall())]
+        for cid in conv_ids:
+            cur.execute(f"DELETE FROM messages WHERE conversation_id={PH}", (cid,))
+            cur.execute(f"DELETE FROM tickets WHERE conversation_id={PH}", (cid,))
+        if conv_ids:
+            placeholders = ",".join([PH] * len(conv_ids))
+            cur.execute(f"DELETE FROM conversations WHERE id IN ({placeholders})", tuple(conv_ids))
+    return len(conv_ids)
+
 def get_stats(username):
     with _db() as c:
         cur = c.cursor()
