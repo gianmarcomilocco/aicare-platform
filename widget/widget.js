@@ -291,7 +291,7 @@
     state.typing = true;
     showTyping();
 
-    var body = { message: text, customer_name: 'Visitatore' };
+    var body = { message: text, customer_name: 'Visitatore', consented: state.consented };
     if (state.convId) body.conversation_id = state.convId;
 
     fetch(cfg.api + '/v1/chat', {

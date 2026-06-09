@@ -82,6 +82,7 @@ class ChatRequest(BaseModel):
     conversation_id: Optional[str] = None
     customer_name:   Optional[str] = "Visitatore"
     customer_email:  Optional[str] = ""
+    consented:       Optional[bool] = False
 
     @field_validator("message")
     @classmethod
@@ -158,6 +159,12 @@ async def chat(request: Request, body: ChatRequest, client: dict = Depends(get_c
             body.customer_email,
         )
         conv_id = f"api_{int_id}"
+        if body.consented and int_id:
+            ip_raw   = request.headers.get("X-Forwarded-For", request.client.host if request.client else "")
+            ip_token = ip_raw.split(",")[0].strip()[:45]
+            import hashlib as _hl
+            ip_hash = _hl.sha256(ip_token.encode()).hexdigest()[:16]
+            _db.log_consent(int_id, ip_hash=ip_hash)
     else:
         try:
             int_id = int(conv_id.replace("api_", ""))

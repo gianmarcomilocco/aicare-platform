@@ -191,6 +191,24 @@ def delete_kb_item(kid):
     with _db() as c:
         cur = c.cursor(); cur.execute(f"DELETE FROM kb_items WHERE id={PH}", (kid,))
 
+def log_consent(conv_id, ip_hash="", widget_version="1.1"):
+    """Log that a user gave consent before chatting (GDPR Art. 6 evidence)."""
+    with _db() as c:
+        cur = c.cursor()
+        ts = "NOW()" if USE_PG else "datetime('now')"
+        if USE_PG:
+            cur.execute(f"""INSERT INTO messages (conversation_id, role, content, intent)
+                VALUES ({PH},{PH},{PH},{PH})""",
+                (conv_id, "system",
+                 f"[CONSENT GIVEN] widget_v={widget_version} ip_hash={ip_hash}",
+                 "consent"))
+        else:
+            cur.execute(f"""INSERT INTO messages (conversation_id, role, content, intent)
+                VALUES ({PH},{PH},{PH},{PH})""",
+                (conv_id, "system",
+                 f"[CONSENT GIVEN] widget_v={widget_version} ip_hash={ip_hash}",
+                 "consent"))
+
 def new_conversation(username, name="Visitatore", email=""):
     with _db() as c:
         cur = c.cursor()
