@@ -201,23 +201,28 @@ async def chat(request: Request, body: ChatRequest, client: dict = Depends(get_c
 @app.post("/v1/whatsapp")
 @limiter.limit("60/minute")
 async def whatsapp_webhook(request: Request,
+                            api_key: Optional[str] = None,
                             x_api_key: str = Header(None, alias="X-Api-Key")):
-    """Twilio WhatsApp webhook."""
-    data     = await request.form()
-    message  = (data.get("Body") or "").strip()[:2000]
+    """Twilio WhatsApp webhook. API key accepted via query param or X-Api-Key header."""
+    data        = await request.form()
+    message     = (data.get("Body") or "").strip()[:2000]
     twiml_empty = '<?xml version="1.0"?><Response></Response>'
 
     if not message:
         return Response(content=twiml_empty, media_type="text/xml")
 
-    client = _db.get_company_by_key(x_api_key) if x_api_key else None
+    # Twilio sends webhook without custom headers — key comes via query string
+    key    = api_key or x_api_key
+    client = _db.get_company_by_key(key) if key else None
     if not client:
         return Response(content=twiml_empty, media_type="text/xml")
 
     kb_items = _db.get_kb(client["username"])
     response = _ai.generate_response(message, [], kb_items, client)
 
-    twiml = f'<?xml version="1.0"?><Response><Message>{response}</Message></Response>'
+    # Escape XML special chars in response
+    safe_response = response.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    twiml = f'<?xml version="1.0"?><Response><Message>{safe_response}</Message></Response>'
     return Response(content=twiml, media_type="text/xml")
 
 
