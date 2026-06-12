@@ -551,7 +551,7 @@ if nav == "💬 Chat":
                 dot = "🟢" if c["status"]=="open" else "⚫"
                 if st.button(f"{dot} {c['customer_name']}\n{c['created_at'][:10]}",
                              key=f"conv_{c['id']}", use_container_width=True):
-                    msgs = db.get_messages(c["id"])
+                    msgs = db.get_messages_verified(c["id"], username)
                     st.session_state.conv_id        = c["id"]
                     st.session_state.customer_name  = c["customer_name"]
                     st.session_state.customer_email = c["customer_email"]
@@ -891,7 +891,7 @@ elif nav == "🎫 Ticket":
                         st.markdown(f"<span style='font-size:.8rem;color:var(--text-2)'>📧 {tk['customer_email']}</span>",
                                     unsafe_allow_html=True)
                     if tk.get("conversation_id"):
-                        msgs = db.get_messages(tk["conversation_id"])
+                        msgs = db.get_messages_verified(tk["conversation_id"], username)
                         if msgs:
                             st.markdown("<p style='font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3);margin:.6rem 0 .4rem'>Cronologia conversazione</p>",
                                         unsafe_allow_html=True)

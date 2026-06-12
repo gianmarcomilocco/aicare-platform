@@ -195,19 +195,8 @@ def log_consent(conv_id, ip_hash="", widget_version="1.1"):
     """Log that a user gave consent before chatting (GDPR Art. 6 evidence)."""
     with _db() as c:
         cur = c.cursor()
-        ts = "NOW()" if USE_PG else "datetime('now')"
-        if USE_PG:
-            cur.execute(f"""INSERT INTO messages (conversation_id, role, content, intent)
-                VALUES ({PH},{PH},{PH},{PH})""",
-                (conv_id, "system",
-                 f"[CONSENT GIVEN] widget_v={widget_version} ip_hash={ip_hash}",
-                 "consent"))
-        else:
-            cur.execute(f"""INSERT INTO messages (conversation_id, role, content, intent)
-                VALUES ({PH},{PH},{PH},{PH})""",
-                (conv_id, "system",
-                 f"[CONSENT GIVEN] widget_v={widget_version} ip_hash={ip_hash}",
-                 "consent"))
+        cur.execute(f"INSERT INTO messages (conversation_id, role, content, intent) VALUES ({PH},{PH},{PH},{PH})",
+            (conv_id, "system", f"[CONSENT GIVEN] widget_v={widget_version} ip_hash={ip_hash}", "consent"))
 
 def new_conversation(username, name="Visitatore", email=""):
     with _db() as c:
@@ -217,14 +206,18 @@ def new_conversation(username, name="Visitatore", email=""):
 def update_conversation_meta(conv_id, sentiment, intent):
     with _db() as c:
         cur = c.cursor()
-        ts = "NOW()" if USE_PG else "datetime('now')"
-        cur.execute(f"UPDATE conversations SET sentiment={PH},intent={PH},updated_at={ts} WHERE id={PH}", (sentiment,intent,conv_id))
+        if USE_PG:
+            cur.execute(f"UPDATE conversations SET sentiment={PH},intent={PH},updated_at=NOW() WHERE id={PH}", (sentiment, intent, conv_id))
+        else:
+            cur.execute(f"UPDATE conversations SET sentiment={PH},intent={PH},updated_at=datetime('now') WHERE id={PH}", (sentiment, intent, conv_id))
 
 def close_conversation(conv_id):
     with _db() as c:
         cur = c.cursor()
-        ts = "NOW()" if USE_PG else "datetime('now')"
-        cur.execute(f"UPDATE conversations SET status='closed',updated_at={ts} WHERE id={PH}", (conv_id,))
+        if USE_PG:
+            cur.execute(f"UPDATE conversations SET status='closed',updated_at=NOW() WHERE id={PH}", (conv_id,))
+        else:
+            cur.execute(f"UPDATE conversations SET status='closed',updated_at=datetime('now') WHERE id={PH}", (conv_id,))
 
 def get_conversations(username, limit=50):
     with _db() as c:
@@ -243,9 +236,23 @@ def get_messages(conv_id):
         cur.execute(f"SELECT * FROM messages WHERE conversation_id={PH} ORDER BY created_at", (conv_id,))
         return _rows(cur.fetchall())
 
+def get_messages_verified(conv_id, username):
+    """Load messages only if the conversation belongs to username (multi-tenant guard)."""
+    with _db() as c:
+        cur = c.cursor()
+        cur.execute(f"SELECT 1 FROM conversations WHERE id={PH} AND username={PH}", (conv_id, username))
+        if not cur.fetchone():
+            return []
+        cur.execute(f"SELECT * FROM messages WHERE conversation_id={PH} ORDER BY created_at", (conv_id,))
+        return _rows(cur.fetchall())
+
 def create_ticket(username, conv_id, title, category, priority, customer_name="", customer_email=""):
     with _db() as c:
         cur = c.cursor()
+        if conv_id:
+            cur.execute(f"SELECT 1 FROM conversations WHERE id={PH} AND username={PH}", (conv_id, username))
+            if not cur.fetchone():
+                conv_id = None
         return _insert(cur, f"INSERT INTO tickets (username,conversation_id,title,category,priority,customer_name,customer_email) VALUES ({PH},{PH},{PH},{PH},{PH},{PH},{PH})", (username,conv_id,title,category,priority,customer_name,customer_email))
 
 def get_tickets(username, status=None):
@@ -260,8 +267,10 @@ def get_tickets(username, status=None):
 def resolve_ticket(tid, notes=""):
     with _db() as c:
         cur = c.cursor()
-        ts = "NOW()" if USE_PG else "datetime('now')"
-        cur.execute(f"UPDATE tickets SET status='risolto',resolved_at={ts},notes={PH} WHERE id={PH}", (notes,tid))
+        if USE_PG:
+            cur.execute(f"UPDATE tickets SET status='risolto',resolved_at=NOW(),notes={PH} WHERE id={PH}", (notes, tid))
+        else:
+            cur.execute(f"UPDATE tickets SET status='risolto',resolved_at=datetime('now'),notes={PH} WHERE id={PH}", (notes, tid))
 
 def update_ticket_priority(tid, priority):
     with _db() as c:

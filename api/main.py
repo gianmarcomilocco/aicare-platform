@@ -49,6 +49,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Management endpoints only accept browser requests from known origins.
+# Server-side calls (no Origin header) are always allowed.
+_ALLOWED_ADMIN_ORIGINS: set = set(
+    filter(None, (o.strip() for o in os.getenv("ALLOWED_ADMIN_ORIGINS", "").split(",")))
+)
+
+async def _check_admin_origin(request: Request):
+    origin = request.headers.get("origin")
+    if origin and _ALLOWED_ADMIN_ORIGINS and origin not in _ALLOWED_ADMIN_ORIGINS:
+        raise HTTPException(status_code=403, detail="Origin not permitted")
+
 WIDGET_PATH = Path(__file__).parent.parent / "widget" / "widget.js"
 
 SECURITY_HEADERS = {
@@ -235,7 +246,7 @@ async def whatsapp_webhook(request: Request,
 
 @app.post("/v1/keys/generate")
 @limiter.limit("5/minute")
-def generate_key(request: Request, body: GenerateKeyRequest):
+def generate_key(request: Request, body: GenerateKeyRequest, _: None = Depends(_check_admin_origin)):
     """One-time call during client onboarding to create their API key."""
     admin_secret = os.getenv("ADMIN_SECRET", "")
     if not admin_secret or body.secret != admin_secret:
@@ -258,7 +269,8 @@ def get_my_key(client: dict = Depends(get_client)):
 @app.post("/v1/gdpr/delete-customer")
 @limiter.limit("10/minute")
 async def gdpr_delete_customer(request: Request, body: GDPRDeleteRequest,
-                                client: dict = Depends(get_client)):
+                                client: dict = Depends(get_client),
+                                _: None = Depends(_check_admin_origin)):
     """
     GDPR Art. 17 — right to erasure.
     Deletes all conversations, messages and tickets for the given customer email
@@ -275,7 +287,8 @@ async def gdpr_delete_customer(request: Request, body: GDPRDeleteRequest,
 @app.get("/v1/gdpr/export-customer")
 @limiter.limit("10/minute")
 async def gdpr_export_customer(request: Request, email: str,
-                                client: dict = Depends(get_client)):
+                                client: dict = Depends(get_client),
+                                _: None = Depends(_check_admin_origin)):
     """
     GDPR Art. 20 — right to data portability.
     Returns all conversations and messages for a customer email as JSON.
